@@ -121,25 +121,13 @@ async function syncUsers(): Promise<void> {
             const displayName: string = entry['displayName']
             // Active: 0 = no incoming mail/no login, 1 = allow both, 2 = custom state: allow incoming mail/no login
             const isActive: ActiveUserSetting = (entry['userAccountControl'] & 0b10) == 2 ? 2 : 1;
-        } catch (error) {
-            console.log(`Exception thrown reading user data mail=${entry['mail']},displayName=${entry['displayName']},UAC=${entry['userAccountControl']}: ${error}`)
-        }
-        
-        try {
+
             // Read data of LDAP user van local DB and mailcow
             const userDataDB: UserDataDB = await checkUserDB(email)
-        } catch (error) {
-            console.log(`Exception thrown comparing local DB with ${entry['mail']}: ${error}`)
-        }
-        try {
-            // Read data of LDAP user van local DB and mailcow
             const userDataAPI: UserDataAPI = await checkUserAPI(email)
-        } catch (error) {
-            console.log(`Exception thrown comparing mailcow API with ${entry['mail']}: ${error}`)
-        }
 
-        try {
             let unchanged = true
+
             // Check if user exists in DB, if not, add user to DB
             if (!userDataDB['exists']) {
                 console.log(`Added filedb user: ${email} (Active: ${isActive})`)
@@ -186,7 +174,7 @@ async function syncUsers(): Promise<void> {
                 console.log("--------------------------------------")
             }
         } catch (error) {
-            console.log(`Exception thrown adding mail=${entry['mail']},displayName=${entry['displayName']},UAC=${entry['userAccountControl']}: ${error}`)
+            console.log(`Exception throw during handling of mail=${entry['mail']},displayName=${entry['displayName']},UAC=${entry['userAccountControl']}: ${error}`)
         }
     }
 
