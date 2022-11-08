@@ -44,11 +44,18 @@ def main():
 def sync():
     ldap_connector = ldap.initialize(f"{config['LDAP_URI']}")
     ldap_connector.set_option(ldap.OPT_REFERRALS, 0)
-    ldap_connector.simple_bind_s(config['LDAP_BIND_DN'], config['LDAP_BIND_DN_PASSWORD'])
-
-    ldap_results = ldap_connector.search_s(config['LDAP_BASE_DN'], ldap.SCOPE_SUBTREE,
+    try:
+        ldap_connector.simple_bind_s(config['LDAP_BIND_DN'], config['LDAP_BIND_DN_PASSWORD'])
+    except ldap.LDAPError as e:
+        logging.info('LDAP Bind Error: %s : Type %s' % (str(e), type(e)))
+        pass
+        
+    try:
+        ldap_results = ldap_connector.search_s(config['LDAP_BASE_DN'], ldap.SCOPE_SUBTREE,
                                            config['LDAP_FILTER'],
                                            ['mail', 'displayName', 'userAccountControl'])
+    except as e:
+        logging.info('LDAP Search Error: %s : Type %s' % (str(e), type(e)))
 
     filedb.session_time = datetime.datetime.now()
 
