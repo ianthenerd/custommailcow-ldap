@@ -21,7 +21,7 @@ A python script periodically checks and creates new LDAP accounts and deactivate
 
     ```yaml
     ldap-mailcow:
-        image: programmierus/ldap-mailcow
+        image: ghcr.io/ianthenerd/custommailcow-ldap:main #Replace ianthenerd with your preferred fork
         network_mode: host
         container_name: mailcowcustomized_ldap-mailcow
         depends_on:
@@ -36,7 +36,7 @@ A python script periodically checks and creates new LDAP accounts and deactivate
             - LDAP-MAILCOW_LDAP_BIND_DN=CN=Bind DN,CN=Users,DC=example,DC=local
             - LDAP-MAILCOW_LDAP_BIND_DN_PASSWORD=BindPassword
             - LDAP-MAILCOW_API_HOST=https://mailcow.example.local
-            - LDAP-MAILCOW_API_KEY=XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX
+            - LDAP-MAILCOW_API_KEY=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX #(31 characters)
             - LDAP-MAILCOW_SYNC_INTERVAL=300
             - LDAP-MAILCOW_LDAP_FILTER=(&(objectClass=user)(objectCategory=person)(memberOf:1.2.840.113556.1.4.1941:=CN=Group,CN=Users,DC=example DC=local))
             - LDAP-MAILCOW_SOGO_LDAP_FILTER=objectClass='user' AND objectCategory='person' AND memberOf:1.2.840.113556.1.4.1941:='CN=Group,CN=Users,DC=example DC=local'
@@ -48,6 +48,8 @@ A python script periodically checks and creates new LDAP accounts and deactivate
     * `LDAP-MAILCOW_LDAP_BASE_DN` - base DN where user accounts can be found
     * `LDAP-MAILCOW_LDAP_BIND_DN` - bind DN of a special LDAP account that will be used to browse for users
     * `LDAP-MAILCOW_LDAP_BIND_DN_PASSWORD` - password for bind DN account
+    * `LDAP-MAILCOW_LDAP_GC_URI` - UNUSED Global Catalog server, ostensibly to speed up lookups. UNUSED BUT REQUIRED.
+    * `LDAP-MAILCOW_LDAP_DOMAIN` - Also apparently UNUSED BUT REQUIRED.
     * `LDAP-MAILCOW_API_HOST` - mailcow API url. Make sure it's enabled and accessible from within the container for both reads and writes
     * `LDAP-MAILCOW_API_KEY` - mailcow API key (read/write)
     * `LDAP-MAILCOW_SYNC_INTERVAL` - interval in seconds between LDAP synchronizations
@@ -92,8 +94,8 @@ Users from your LDAP directory will be added (and deactivated if disabled/not fo
 
 ## Customizations and Integration support
 
-External authentication (identity federation) is an enterprise feature [for mailcow](https://github.com/mailcow/mailcow-dockerized/issues/2316#issuecomment-491212921). That’s why I developed an external solution, and it is unlikely that it’ll be ever directly integrated into mailcow.
+External authentication (identity federation) is an enterprise feature [for mailcow](https://github.com/mailcow/mailcow-dockerized/issues/2316#issuecomment-491212921). That’s why programmierus developed an external solution, and it is unlikely that it’ll be ever directly integrated into mailcow.
 
-I’ve created this tool because I needed it for my regular work. You are free to use it for commercial needs. Please understand that I can work on issues only if they fall within the scope of my current work interests or if I’ll have some available free time (never happened for many years). I’ll do my best to review submitted PRs ASAP, though.
+programmierus created this tool because they needed it for their regular work. You are free to use it for commercial needs. Programmierus can work on issues only if they fall within the scope of their current work interests or if they’ll have some available free time (never happened for many years).
 
-**You can always [contact me](mailto:programmierus@gmail.com) to help you with the integration or for custom modifications on a paid basis. My current hourly rate (ActivityWatch tracked) is 100,-€ with 3h minimum commitment.**
+**You may [contact the main branch programmer](mailto:programmierus@gmail.com) to help you with the integration or for custom modifications on a paid basis. Their current hourly rate (ActivityWatch tracked) is 100,-€ with 3h minimum commitment. There are no guarantees they will be willing to work on forks of their main branch such as this one.**
