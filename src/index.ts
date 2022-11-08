@@ -78,7 +78,7 @@ async function initializeSync(): Promise<void> {
 
     // Start sync loop every interval milliseconds
     while (true) {
-        console.log("Syncing users")
+        console.log("Syncing users...")
         await syncUsers()
         const interval = parseInt(config['SYNC_INTERVAL'])
         console.log(`Sync finished, sleeping ${interval} seconds before next cycle`)
@@ -174,7 +174,7 @@ async function syncUsers(): Promise<void> {
                 console.log("--------------------------------------")
             }
         } catch (error) {
-            console.log(`Exception throw during handling of ${entry}: ${error}`)
+            console.log(`Exception throw during handling of mail=${entry['mail']},displayName=${entry['displayName']},UAC=${entry['userAccountControl']}: ${error}`)
         }
     }
 
