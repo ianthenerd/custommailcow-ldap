@@ -22,4 +22,4 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           push: true
-          tags: ghcr.io/gewis/custommailcow-ldap:${{ github.ref_name }}
+          tags: ghcr.io/ianthenerd/custommailcow-ldap:${{ github.ref_name }}
