@@ -27,9 +27,9 @@ A python script periodically checks and creates new LDAP accounts and deactivate
         depends_on:
             - nginx-mailcow
         volumes:
-            - ./data/ldap:/db:rw
-            - ./data/conf/dovecot:/conf/dovecot:rw
-            - ./data/conf/sogo:/conf/sogo:rw
+            - ./data/ldap:/app/db:rw
+            - ./data/conf/dovecot:/app/conf/dovecot:rw
+            - ./data/conf/sogo:/app/conf/sogo:rw
         environment:
             - LDAP-MAILCOW_LDAP_URI=ldap(s)://dc.example.local
             - LDAP-MAILCOW_LDAP_BASE_DN=OU=Mail Users,DC=example,DC=local
