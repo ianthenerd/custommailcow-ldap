@@ -55,17 +55,24 @@ async function initializeSync(): Promise<void> {
         url: config['LDAP_URI'],
     })
     await LDAPConnector.bind(config['LDAP_BIND_DN'], config['LDAP_BIND_DN_PASSWORD'])
+    console.log("checkpoint #1")
 
     // Adjust template files
     const passDBConfig: string = await readPassDBConfig();
+    console.log("checkpoint #2")
     const pListLDAP: string = await readPListLDAP();
+    console.log("checkpoint #3")
     // Read data in extra config file
     const extraConfig: string = await readDovecotExtraConfig();
+    console.log("checkpoint #4")
 
     // Apply all config files, see if any changed
     const passDBConfigChanged: boolean = applyConfig('./conf/dovecot/ldap/passdb.conf', passDBConfig)
+    console.log("checkpoint #5")
     const extraConfigChanged: boolean = applyConfig('./conf/dovecot/extra.conf', extraConfig)
+    console.log("checkpoint #6")
     const pListLDAPChanged: boolean = applyConfig('./conf/sogo/plist_ldap', pListLDAP)
+    console.log("checkpoint #7")
 
     if (passDBConfigChanged || extraConfigChanged || pListLDAPChanged)
     // eslint-disable-next-line max-len
@@ -121,12 +128,9 @@ async function syncUsers(): Promise<void> {
             const displayName: string = entry['displayName']
             // Active: 0 = no incoming mail/no login, 1 = allow both, 2 = custom state: allow incoming mail/no login
             const isActive: ActiveUserSetting = (entry['userAccountControl'] & 0b10) == 2 ? 2 : 1;
-
             // Read data of LDAP user van local DB and mailcow
             const userDataDB: UserDataDB = await checkUserDB(email)
             const userDataAPI: UserDataAPI = await checkUserAPI(email)
-
-            let unchanged = true
 
             // Check if user exists in DB, if not, add user to DB
             if (!userDataDB['exists']) {
@@ -134,7 +138,6 @@ async function syncUsers(): Promise<void> {
                 await addUserDB(email, isActive)
                 userDataDB['exists'] = true;
                 userDataDB['isActive'] = isActive;
-                unchanged = false
             }
 
             // Check if user exists in Mailcow, if not, add user to Mailcow
@@ -144,58 +147,27 @@ async function syncUsers(): Promise<void> {
                 userDataAPI['exists'] = true
                 userDataAPI['isActive'] = isActive
                 userDataAPI['displayName'] = displayName
-                unchanged = false
             }
 
             // Check if user is active in DB, if not, adjust accordingly
             if (userDataDB["isActive"] !== isActive) {
                 console.log(`Set ${email} to active ${isActive} in filedb`)
-                await activityUserDB(email, isActive)
-                unchanged = false
+                await activityUserDB(email, isActive, 0)
             }
 
             // Check if user is active in Mailcow, if not, adjust accordingly
             if (userDataAPI["isActive"] !== isActive) {
                 console.log(`Set ${email} to active ${isActive} in Mailcow`)
-                // await editUserAPI(email, {active: isActive})
-                unchanged = false
+                await editUserAPI(email, {active: isActive})
             }
 
             // Check if user's name in Mailcow matches LDAP name, adjust accordingly
             if (userDataAPI["displayName"] !== displayName) {
                 console.log(`Changed name of ${email} to ${displayName} in Mailcow`)
                 await editUserAPI(email, {name: displayName})
-                unchanged = false;
-            }
-
-            if (unchanged) {
-                // console.log(`Checked user ${email}, no changes needed`)
-            } else {
-                console.log("--------------------------------------")
             }
         } catch (error) {
             console.log(`Exception throw during handling of mail=${entry['mail']},displayName=${entry['displayName']},UAC=${entry['userAccountControl']}: ${error}`)
-        }
-    }
-
-    // Check all users in DB that have not yet been checked and are active
-    console.log('Checking users that are no longer in AD')
-    for (const user of await getUncheckedActiveUsers()) {
-        try {
-            // Get user data from Mailcow
-            const userDataAPI: UserDataAPI = await checkUserAPI(user.email)
-
-            // Check if user is still active, if so, deactivate user
-            if (userDataAPI["isActive"]) {
-                console.log(`Deactivated user ${user.email} in Mailcow, not found in LDAP`)
-                await editUserAPI(user.email, {active: 0})
-            }
-
-            // Since user does not exist anymore, deactive user in filedb
-            console.log(`Deactivated user ${user.email} in filedb, not found in LDAP`)
-            await activityUserDB(user.email, 0)
-        } catch (error) {
-            console.log(`Exception throw during handling of ${user}: ${error}`)
         }
     }
 
@@ -203,9 +175,11 @@ async function syncUsers(): Promise<void> {
     console.log("Settings SOB permissions")
     for (const entry of LDAPResults['searchEntries'] as unknown as LDAPResults[]) {
         try {
-            console.log("--------------------------")
-            // if (entry[MailcowPermissions.mailPermRO].length != 0)
-            //     await syncUserPermissions(entry, MailcowPermissions.mailPermRO);
+            console.log("Looking at" + entry['mail']);
+            if (entry['mail'] === 'm999@gewis.nl') {
+                // if (entry[MailcowPermissions.mailPermRO].length != 0)
+                    await syncUserPermissions(entry, MailcowPermissions.mailPermRO);
+            }
             // if (entry[MailcowPermissions.mailPermRW].length != 0)
             //     await syncUserPermissions(entry, MailcowPermissions.mailPermRW);
             // if (entry[MailcowPermissions.mailPermROInbox].length != 0)
@@ -231,20 +205,47 @@ async function syncUsers(): Promise<void> {
         }
     }
 
+    // Check all users in DB that have not yet been checked and are active
+    console.log('Checking users that are no longer in AD')
+    for (const user of await getUncheckedActiveUsers()) {
+        try {
+            // Get user data from Mailcow
+            const userDataAPI: UserDataAPI = await checkUserAPI(user.email)
+            const userDataDB:  UserDataDB = await checkUserDB(user.email)
+            const inactiveCount = userDataDB['inactiveCount']
+
+            // Check if user has not existed for 96 iterations (96 * 900 = 24 hours), if so, set to inactive
+            if (inactiveCount > 96) {
+                console.log(`Deactivated user ${user.email} in filedb, not found in LDAP`)
+                await activityUserDB(user.email, 0, 255)
+            } else {
+                console.log(`Increased inactive count to ${inactiveCount + 1} for ${user.email}`)
+                await activityUserDB(user.email, 2, inactiveCount + 1)
+            }
+
+            // Check if user is still active, if so, deactivate user
+            if (userDataAPI["isActive"] && userDataDB['isActive'] === 0) {
+                console.log(`Deactivated user ${user.email} in Mailcow, not found in LDAP`)
+                await editUserAPI(user.email, {active: 0})
+            }
+        } catch (error) {
+            console.log(`Exception throw during handling of ${user}: ${error}`)
+        }
+    }
 }
 
 async function syncUserPermissions(entry: LDAPResults, type: MailcowPermissions) {
-    const permissionResults: SearchResult = await LDAPConnector.search(entry[type], {
-        scope: 'sub',
-        attributes: ['memberFlattened']
-    });
-    updatePermissionsDB(entry['mail'],
-        (permissionResults['searchEntries'][0] as unknown as LDAPResults)['memberFlattened'], type)
-        .then((results: ACLResults) => {
-            setMailPerm(entry['mail'], results.newUsers, type, false)
-            setMailPerm(entry['mail'], results.removedUsers, type,true)
-        }
-    )
+    // const permissionResults: SearchResult = await LDAPConnector.search(entry[type], {
+    //     scope: 'sub',
+    //     attributes: ['memberFlattened']
+    // });
+    // updatePermissionsDB(entry['mail'],
+    //     (permissionResults['searchEntries'][0] as unknown as LDAPResults)['memberFlattened'], type)
+    //     .then((results: ACLResults) => {
+            setMailPerm(entry['mail'], null, type, false)
+            // setMailPerm(entry['mail'], results.removedUsers, type,true)
+        // }
+    // )
 }
 
 async function syncUserSOB(entry: LDAPResults) {
@@ -256,6 +257,9 @@ async function syncUserSOB(entry: LDAPResults) {
     // Construct list in database with DN of all committees they are in
     // Get existing list of committees, add new DN as string
     for (const members of SOBResults['searchEntries'] as unknown as LDAPResults[]) {
+        // For some reason a single entry is returned as string, so turn it into an array
+        if (!Array.isArray(members['memberFlattened']))
+            members['memberFlattened'] = [members['memberFlattened']]
         for (const member of members['memberFlattened']) {
             const member_results: SearchResult = await LDAPConnector.search(member, {
                 scope: 'sub',
@@ -281,7 +285,8 @@ function readConfig(): void {
         'LDAP-MAILCOW_LDAP_BIND_DN_PASSWORD',
         'LDAP-MAILCOW_API_HOST',
         'LDAP-MAILCOW_API_KEY',
-        'LDAP-MAILCOW_SYNC_INTERVAL'
+        'LDAP-MAILCOW_SYNC_INTERVAL',
+        'DOVEADM_API_KEY'
     ]
 
     // Check if all keys are set in the environment
@@ -381,7 +386,7 @@ async function readPassDBConfig(): Promise<string> {
  */
 async function readDovecotExtraConfig(): Promise<string> {
     const options: ReplaceInFileConfig = {
-        files: './templates/dovecot/ldap/extra.conf',
+        files: './templates/dovecot/extra.conf',
         from: ['$doveadm_api_key'],
         to: [
             config['DOVEADM_API_KEY']
